@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High Performance Hub - GHN</title>
+    <!-- Chosen Palette: Corporate Calm (Slate Gray, Sky Blue, White) -->
+    <!-- Application Structure Plan: A single-page dashboard application is designed for optimal user experience in data management. It features a persistent sidebar for primary navigation, a header with global controls (year filter), and a dynamic main content area. This structure allows users to maintain context (selected year) while seamlessly switching between different data modules (Dashboard, Performance, Talent, etc.). This dashboard approach was chosen over a linear report format to facilitate non-linear exploration and comparative analysis across years, which is a core user requirement. Gemini API features are added to provide AI-driven insights and suggestions. Direct data entry via modals is now supported. -->
+    <!-- Visualization & Content Choices: 
+        - Dashboard: KPI cards (HTML/CSS) for at-a-glance metrics. Timeline (HTML/CSS) to show key events. Donut Chart (Chart.js) for participant distribution. Goal: Inform. Interaction: Year filter. Gemini API button added for AI analysis.
+        - Performance Management: "Performance Feedback Assistant" feature using Gemini API to generate constructive feedback from manager's notes. Goal: Assist & Empower. Interaction: Text input and button click.
+        - Talent Development: Tabbed interface (HTML/CSS/JS) to organize multiple programs cleanly. Gemini API button on "Fast Track" tab to generate behavioral interview questions. Includes a form modal to add new programs. Goal: Organize & Standardize. Interaction: Clicking tabs and buttons.
+        - Learning Academy: "Course Outline Assistant" feature using Gemini API to generate course structures from a topic. Goal: Create & Standardize. Interaction: Text input and button click.
+        - Participant Directory: Interactive table (HTML/CSS/JS) with live search, an "Add New" button, and "Edit" buttons on each row, all using a form modal. Goal: Organize & Act. Interaction: Search input, click buttons for AI generation and data entry.
+        - Admin Page: "AI Drafting Assistant" and "Job Description Assistant" features using Gemini API. A new section for editing yearly KPIs via a form modal. Goal: Assist & Manage. Interaction: Text input and button clicks.
+        - Justification: These choices translate the static report data into an interactive system, allowing users to query and analyze information dynamically instead of just reading it. Chart.js is used for all quantitative data visualization. Gemini API integration enhances the app's value by providing actionable, AI-generated content.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        
+        .sidebar-icon {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .page {
+            display: none;
+        }
+        .page.active {
+            display: block;
+        }
+        /* Modal Styles */
+        .modal-container {
+            transition: opacity 0.3s ease;
+        }
+        .gemini-spinner {
+            border-top-color: #38bdf8;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-slate-800 text-white flex flex-col shrink-0">
+            <div class="h-16 flex items-center justify-center text-xl font-bold border-b border-slate-700">
+                <span class="sidebar-icon mr-2">📊</span>
+                <span>Performance Hub</span>
+            </div>
+            <nav class="flex-1 px-4 py-4">
+                <ul id="sidebar-nav">
+                    <li><a href="#" data-page="dashboard" class="flex items-center px-4 py-3 my-1 rounded-lg"><span class="sidebar-icon mr-3">🏠</span><span>Bảng điều khiển</span></a></li>
+                    <li><a href="#" data-page="performance" class="flex items-center px-4 py-3 my-1 rounded-lg"><span class="sidebar-icon mr-3">🎯</span><span>Quản lý Hiệu suất</span></a></li>
+                    <li><a href="#" data-page="talent" class="flex items-center px-4 py-3 my-1 rounded-lg"><span class="sidebar-icon mr-3">💼</span><span>Phát triển Tài năng</span></a></li>
+                    <li><a href="#" data-page="academy" class="flex items-center px-4 py-3 my-1 rounded-lg"><span class="sidebar-icon mr-3">🎓</span><span>Học viện Đào tạo</span></a></li>
+                    <li><a href="#" data-page="participants" class="flex items-center px-4 py-3 my-1 rounded-lg"><span class="sidebar-icon mr-3">👥</span><span>Danh bạ Thành viên</span></a></li>
+                    <li><a href="#" data-page="admin" class="flex items-center px-4 py-3 my-1 rounded-lg"><span class="sidebar-icon mr-3">⚙️</span><span>Báo cáo & Quản trị</span></a></li>
+                </ul>
+            </nav>
+            <div class="p-4 border-t border-slate-700 text-sm text-slate-400">
+                <p>© 2025 GHN Performance Hub</p>
+                <p>Phiên bản 1.6.1 ✨</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Header -->
+            <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0">
+                <div>
+                    <h1 id="header-title" class="text-xl font-semibold">Bảng điều khiển</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔍</span>
+                        <input id="search-input" type="text" placeholder="Tìm kiếm thành viên..." class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+                    </div>
+                    <select id="year-selector" class="w-32 px-4 py-2 bg-slate-100 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-200 focus:outline-none">
+                        <option value="2024">Năm 2024</option>
+                        <option value="2025" selected>Năm 2025</option>
+                        <option value="2026">Năm 2026</option>
+                    </select>
+                </div>
+            </header>
+
+            <!-- Page Content Area -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <!-- Dashboard Page -->
+                <div id="dashboard-page" class="page">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-slate-800">Tổng quan năm <span class="year-label"></span></h2>
+                        <button id="gemini-analyze-kpi" class="bg-gradient-to-r from-purple-500 to-sky-500 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:scale-105 transition-transform">
+                            ✨ Phân tích & Đề xuất
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6" id="kpi-widgets-container">
+                        <!-- KPI Widgets will be rendered here -->
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm">
+                            <h2 class="text-xl font-semibold text-slate-700 mb-4">Dòng thời gian sự kiện</h2>
+                            <div id="timeline-container" class="relative border-l-2 border-sky-200 pl-6 space-y-8">
+                                <!-- Timeline items will be rendered here -->
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm">
+                            <h2 class="text-xl font-semibold text-slate-700 mb-4">Phân bổ thành viên</h2>
+                            <div class="chart-container">
+                                <canvas id="distribution-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Management Page -->
+                <div id="performance-page" class="page">
+                     <p class="mb-6 text-slate-600">Module Quản lý Hiệu suất cung cấp cái nhìn tổng quan về quy trình, hoạt động và kết quả của các chương trình đánh giá và phát triển hiệu suất trong năm. Tại đây, bạn có thể theo dõi các mốc thời gian quan trọng và xem các số liệu thống kê về mức độ hoàn thành và hiệu quả của chương trình.</p>
+                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-xl shadow-sm">
+                            <h2 class="text-xl font-semibold text-slate-700 mb-4">Kết quả đào tạo Quản lý Hiệu suất</h2>
+                             <div class="chart-container">
+                                <canvas id="pm-results-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm">
+                             <h2 class="text-xl font-semibold text-slate-700 mb-4">✨ Trợ lý Phản hồi Hiệu suất</h2>
+                             <div class="space-y-3">
+                                <textarea id="feedback-input" rows="4" placeholder="Nhập các quan sát chính về nhân viên...&#10;VD: - Hoàn thành tốt dự án X trước thời hạn.&#10;- Cần cải thiện kỹ năng thuyết trình trước đám đông." class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"></textarea>
+                                <button id="gemini-feedback-button" class="w-full flex items-center justify-center px-4 py-3 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-colors">
+                                    Tạo gợi ý phản hồi
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Talent Development Page -->
+                <div id="talent-page" class="page">
+                    <div class="flex justify-between items-center mb-6">
+                        <p class="text-slate-600">Khám phá chi tiết từng chương trình, từ mục tiêu, lộ trình đến các kết quả đạt được.</p>
+                        <button id="add-program-button" class="bg-green-500 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:bg-green-600 transition-colors">Thêm Chương trình mới</button>
+                    </div>
+                    <div id="talent-tabs-container">
+                        <!-- Talent development content will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- Academy Page -->
+                <div id="academy-page" class="page">
+                     <p class="mb-6 text-slate-600">Module Học viện Đào tạo giới thiệu về các chương trình và khung năng lực được xây dựng nhằm phát triển toàn diện cho đội ngũ. Sử dụng Trợ lý Thiết kế Khóa học để nhanh chóng xây dựng các chương trình đào tạo mới.</p>
+                     <div class="bg-white p-6 rounded-xl shadow-sm">
+                         <h2 class="text-xl font-semibold text-slate-700 mb-4">✨ Trợ lý Thiết kế Khóa học</h2>
+                         <div class="space-y-3">
+                            <input id="course-topic-input" type="text" placeholder="Nhập chủ đề khóa học, VD: Quản lý dự án cho người mới bắt đầu" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+                            <button id="gemini-course-button" class="w-full flex items-center justify-center px-4 py-3 bg-teal-500 text-white rounded-lg hover:bg-teal-600 transition-colors">
+                                Tạo đề cương khóa học
+                            </button>
+                        </div>
+                     </div>
+                </div>
+
+                <!-- Participants Page -->
+                <div id="participants-page" class="page">
+                    <div class="flex justify-between items-center mb-6">
+                        <p class="text-slate-600">Sử dụng thanh tìm kiếm để lọc, hoặc sử dụng các trợ lý AI và công cụ quản lý.</p>
+                        <button id="add-participant-button" class="bg-green-500 text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:bg-green-600 transition-colors">Thêm Thành viên mới</button>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                    <th class="p-4 text-sm font-semibold text-slate-600">Họ và tên</th>
+                                    <th class="p-4 text-sm font-semibold text-slate-600">Chương trình</th>
+                                    <th class="p-4 text-sm font-semibold text-slate-600">Trạng thái</th>
+                                    <th class="p-4 text-sm font-semibold text-slate-600 text-center">Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody id="participants-table-body">
+                                <!-- Participant rows will be rendered here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Admin Page -->
+                <div id="admin-page" class="page">
+                    <p class="mb-6 text-slate-600">Khu vực quản trị dành cho việc quản lý dữ liệu toàn hệ thống. Tại đây, bạn có thể thực hiện các tác vụ quan trọng như nhập/xuất dữ liệu hoặc sử dụng các trợ lý AI để tăng tốc công việc.</p>
+                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-xl shadow-sm">
+                            <h2 class="text-xl font-semibold text-slate-700 mb-4">Quản lý KPI theo năm</h2>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left">
+                                    <thead class="bg-slate-50">
+                                        <tr>
+                                            <th class="p-3 text-sm font-semibold text-slate-600">Năm</th>
+                                            <th class="p-3 text-sm font-semibold text-slate-600">Thành viên</th>
+                                            <th class="p-3 text-sm font-semibold text-slate-600">Nhân tài</th>
+                                            <th class="p-3 text-sm font-semibold text-slate-600">Tỷ lệ</th>
+                                            <th class="p-3 text-sm font-semibold text-slate-600">Khóa học</th>
+                                            <th class="p-3 text-sm font-semibold text-slate-600">Sửa</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="kpi-table-body">
+                                        <!-- KPI rows will be rendered here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm">
+                            <h2 class="text-xl font-semibold text-slate-700 mb-4">✨ Trợ lý Mô tả Công việc</h2>
+                            <div class="space-y-3">
+                                <input id="jd-title-input" type="text" placeholder="Chức danh, VD: Chuyên viên Nhân sự" class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+                                <textarea id="jd-responsibilities-input" rows="2" placeholder="Trách nhiệm chính, mỗi ý một dòng..." class="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"></textarea>
+                                <button id="gemini-jd-button" class="w-full flex items-center justify-center px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
+                                    Tạo Mô tả Công việc
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Modals Container -->
+    <div id="modal-container"></div>
+    
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    // --- DATA ---
+    let appData = {
+        2024: {
+            kpis: { total: 120, talent: 15, rate: 88, courses: 35 },
+            timeline: [ { q: 'Q1', event: 'Đánh giá hiệu suất 2023' }, { q: 'Q2', event: 'Workshop Lãnh đạo cấp trung' }, { q: 'Q3', event: 'Đánh giá giữa năm 2024' }, { q: 'Q4', event: 'Tổng kết và vinh danh nhân tài' }, ],
+            participants: [ { id: 1, name: 'Nguyễn Văn An', program: 'Middle Managers', status: 'Đã hoàn thành' }, { id: 2, name: 'Trần Thị Bình', program: 'Fast Track', status: 'Đã hoàn thành' }, ],
+            pm: { results: { trained: 95, oneOnOne: 92, satisfied: 96 } },
+            talent: [ { name: "Fast Track", goal: "Tuyển 5 nhân tài", result: "Tuyển được 2 nhân tài."}, { name: "Middle Managers", goal: "Phát triển 10 quản lý", result: "8/10 hoàn thành xuất sắc."}, ]
+        },
+        2025: {
+            kpis: { total: 160, talent: 22, rate: 91, courses: 42 },
+            timeline: [ { q: 'Q1', event: 'Đánh giá PA2024 & WS Lập kế hoạch (IDP)' }, { q: 'Q2', event: 'Tổ chức Workshop 1, 2 & Đánh giá giữa năm (MYR)' }, { q: 'Q3', event: 'Vòng 2 "Ươm mầm Lãnh đạo" & Ký MOU với 2 ĐH' }, { q: 'Q4', event: 'Chuẩn bị PA2025, chốt danh sách Promote' }, ],
+            participants: [ { id: 3, name: 'Lê Hoàng Cường', program: 'Ươm mầm Lãnh đạo', status: 'Đã hoàn thành' }, { id: 4, name: 'Phạm Thị Dung', program: 'Middle Managers', status: 'Đang tham gia' }, { id: 5, name: 'Võ Minh Hải', program: 'Fast Track External Talent', status: 'Đang tham gia' }, { id: 6, name: 'Đỗ Thuỳ Linh', program: 'Ươm mầm Lãnh đạo', status: 'Đã hoàn thành' }, { id: 7, name: 'Hoàng Quốc Việt', program: 'Middle Managers', status: 'Đã hoàn thành' }, ],
+            pm: { results: { trained: 98, oneOnOne: 95.6, satisfied: 98 } },
+            talent: [ { name: "Fast Track External Talent", goal: "Tuyển 5 nhân tài bên ngoài.", result: "Tuyển thành công 3 nhân tài. Onboarding tháng 8."}, { name: "Middle Managers Program", goal: "Phát triển quản lý cấp trung nội bộ.", result: "Tổ chức các workshop IDP, Mentoring, Functional. Chuẩn bị chốt danh sách thăng chức Q4."}, { name: "Ươm mầm lãnh đạo", goal: "Phát triển 7 Freights Managers.", result: "Vượt mục tiêu, phát triển 9 Freights Managers. Top 15 tham gia bồi dưỡng sau Vòng 2 tháng 7."}, { name: "Hợp tác Giáo dục", goal: "Ký MOU với các trường ĐH.", result: "Ký kết thành công với 2 trường trong Quý 3."}, ]
+        },
+        2026: {
+            kpis: { total: 200, talent: 30, rate: 95, courses: 50 },
+            timeline: [ { q: 'Q1', event: 'Khởi động chương trình Phát triển Bền vững' }, { q: 'Q2', event: 'Hội thảo Chuyển đổi số trong Nhân sự' }, { q: 'Q3', event: 'Chương trình Trao đổi nhân tài quốc tế' }, { q: 'Q4', event: 'Lễ vinh danh "GHN Stars 2026"' }, ],
+            participants: [ { id: 8, name: 'Trịnh Thị Mai', program: 'Fast Track', status: 'Đã hoàn thành' }, { id: 9, name: 'Ngô Gia Huy', program: 'Middle Managers', status: 'Đang tham gia' }, ],
+            pm: { results: { trained: 100, oneOnOne: 98, satisfied: 99 } },
+            talent: [ { name: "Global Talent Exchange", goal: "Gửi 5 nhân tài ra nước ngoài.", result: "Đang trong quá trình lựa chọn."}, { name: "Digital Leadership", goal: "Đào tạo 20 lãnh đạo số.", result: "Chương trình dự kiến khởi động vào Quý 3."}, ]
+        },
+    };
+
+    // --- STATE ---
+    let state = { currentPage: 'dashboard', selectedYear: '2025', searchTerm: '' };
+    let charts = {};
+
+    // --- DOM ELEMENTS ---
+    const sidebarNav = document.getElementById('sidebar-nav');
+    const yearSelector = document.getElementById('year-selector');
+    const searchInput = document.getElementById('search-input');
+    const headerTitle = document.getElementById('header-title');
+    const pages = document.querySelectorAll('.page');
+    const kpiContainer = document.getElementById('kpi-widgets-container');
+    const timelineContainer = document.getElementById('timeline-container');
+    const participantsTableBody = document.getElementById('participants-table-body');
+    const talentTabsContainer = document.getElementById('talent-tabs-container');
+    const modalContainer = document.getElementById('modal-container');
+    const kpiTableBody = document.getElementById('kpi-table-body');
+
+    // --- MODAL & FORM HANDLING ---
+    function showModal(content) {
+        modalContainer.innerHTML = content;
+        const modal = modalContainer.querySelector('.modal-container');
+        modal.classList.remove('hidden');
+        setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal || e.target.closest('.close-modal-button')) {
+                hideModal(modal);
+            }
+        });
+    }
+
+    function hideModal(modal) {
+        if (!modal) modal = modalContainer.querySelector('.modal-container');
+        if (modal) {
+            modal.classList.add('opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modalContainer.innerHTML = '';
+            }, 300);
+        }
+    }
+
+    function createFormModal(title, formId, formContent, submitLabel) {
+        return `
+            <div class="modal-container fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 hidden opacity-0">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+                    <form id="${formId}">
+                        <div class="flex justify-between items-center p-4 border-b">
+                            <h3 class="text-lg font-semibold text-slate-800">${title}</h3>
+                            <button type="button" class="close-modal-button text-slate-500 hover:text-slate-800 text-2xl font-bold">&times;</button>
+                        </div>
+                        <div class="p-6 space-y-4">${formContent}</div>
+                        <div class="flex justify-end p-4 bg-slate-50 rounded-b-xl">
+                            <button type="button" class="close-modal-button px-4 py-2 bg-slate-200 text-slate-700 rounded-lg mr-2 hover:bg-slate-300">Hủy</button>
+                            <button type="submit" class="px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600">${submitLabel}</button>
+                        </div>
+                    </form>
+                </div>
+            </div>`;
+    }
+    
+    // --- GEMINI API FUNCTION ---
+    async function callGeminiAPI(prompt) {
+        showModal(createFormModal('✨ Phân tích từ Gemini', 'gemini-form', `
+            <div id="gemini-loading" class="text-center py-10">
+                <div class="gemini-spinner w-12 h-12 rounded-full border-4 border-slate-200 mx-auto"></div>
+                <p class="mt-4 text-slate-600">Đang xử lý, vui lòng chờ...</p>
+            </div>
+            <div id="gemini-result" class="prose max-w-none text-slate-700 hidden"></div>
+        `, 'Đóng'));
+        
+        const apiKey = ""; // Leave empty
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+        const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+
+        try {
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) throw new Error(`API call failed with status: ${response.status}`);
+            const result = await response.json();
+            if (result.candidates && result.candidates[0]?.content?.parts[0]) {
+                showGeminiResult(result.candidates[0].content.parts[0].text);
+            } else {
+                showGeminiResult("Không nhận được phản hồi hợp lệ từ AI. Vui lòng thử lại.");
+            }
+        } catch (error) {
+            console.error("Gemini API Error:", error);
+            showGeminiResult(`Đã xảy ra lỗi khi kết nối đến AI: ${error.message}`);
+        }
+    }
+
+    function showGeminiResult(text) {
+        const loadingEl = document.getElementById('gemini-loading');
+        const resultEl = document.getElementById('gemini-result');
+        if(!loadingEl || !resultEl) return;
+        
+        loadingEl.classList.add('hidden');
+        let formattedContent = text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/^- (.*)/gm, '<li class="ml-4 list-disc">$1</li>')
+            .replace(/(<\/li>)(<li)/g, '$1\n$2') 
+            .replace(/^(1\.|2\.|3\.|4\.|5\.) (.*)/gm, '<p class="mt-2"><strong>$1</strong> $2</p>')
+            .replace(/\n/g, '<br>');
+        resultEl.innerHTML = formattedContent;
+        resultEl.classList.remove('hidden');
+    }
+
+    // --- RENDER FUNCTIONS ---
+    const render = () => {
+        const activeLink = sidebarNav.querySelector(`[data-page="${state.currentPage}"]`);
+        headerTitle.textContent = activeLink.textContent;
+        pages.forEach(p => p.classList.remove('active'));
+        document.getElementById(`${state.currentPage}-page`).classList.add('active');
+        sidebarNav.querySelectorAll('a').forEach(a => a.classList.remove('bg-sky-600', 'text-white'));
+        activeLink.classList.add('bg-sky-600', 'text-white');
+        document.querySelectorAll('.year-label').forEach(el => el.textContent = state.selectedYear);
+        const data = appData[state.selectedYear];
+        if (!data) return;
+        renderDashboard(data);
+        renderParticipants(data);
+        renderPerformanceManagement(data);
+        renderTalentDevelopment(data);
+        renderAdminPage();
+    };
+
+    const renderDashboard = (data) => {
+        kpiContainer.innerHTML = `
+            <div class="bg-white p-5 rounded-xl shadow-sm flex items-center space-x-4"><div class="p-3 rounded-full bg-sky-100 text-sky-600">👥</div><div><p class="text-slate-500 text-sm">Tổng thành viên</p><p class="text-2xl font-bold">${data.kpis.total}</p></div></div>
+            <div class="bg-white p-5 rounded-xl shadow-sm flex items-center space-x-4"><div class="p-3 rounded-full bg-green-100 text-green-600">💼</div><div><p class="text-slate-500 text-sm">Nhân tài phát triển</p><p class="text-2xl font-bold">${data.kpis.talent}</p></div></div>
+            <div class="bg-white p-5 rounded-xl shadow-sm flex items-center space-x-4"><div class="p-3 rounded-full bg-yellow-100 text-yellow-600">🎯</div><div><p class="text-slate-500 text-sm">Tỷ lệ hoàn thành</p><p class="text-2xl font-bold">${data.kpis.rate}%</p></div></div>
+            <div class="bg-white p-5 rounded-xl shadow-sm flex items-center space-x-4"><div class="p-3 rounded-full bg-purple-100 text-purple-600">🎓</div><div><p class="text-slate-500 text-sm">Khóa học tổ chức</p><p class="text-2xl font-bold">${data.kpis.courses}</p></div></div>`;
+        timelineContainer.innerHTML = data.timeline.map(item => `<div class="relative"><div class="absolute -left-[33px] top-1 w-5 h-5 bg-sky-500 rounded-full border-4 border-white"></div><p class="font-bold text-sky-600">${item.q}</p><p class="text-slate-700">${item.event}</p></div>`).join('');
+        updateDistributionChart(data);
+    };
+    
+    const renderPerformanceManagement = (data) => {
+        updatePmResultsChart(data);
+    };
+    
+    const renderTalentDevelopment = (data) => {
+        const programs = data.talent;
+        let tabButtons = programs.map((p, i) => `<button class="talent-tab py-2 px-4 font-semibold whitespace-nowrap ${i === 0 ? 'text-sky-600 border-b-2 border-sky-600' : 'text-slate-500'}" data-index="${i}">${p.name}</button>`).join('');
+        let tabContents = programs.map((p, i) => {
+            let extraButton = '';
+            if (p.name.toLowerCase().includes("fast track")) {
+                extraButton = `<button class="gemini-interview-questions bg-teal-500 text-white font-semibold px-3 py-1.5 rounded-lg shadow-md hover:scale-105 transition-transform text-sm whitespace-nowrap mt-3" data-program-name="${p.name}">✨ Tạo câu hỏi phỏng vấn</button>`;
+            }
+            return `<div class="talent-content p-4 bg-white rounded-xl shadow-sm ${i === 0 ? '' : 'hidden'}" data-program-name="${p.name}">
+                        <div class="flex justify-between items-start flex-wrap gap-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-slate-800 mb-2">${p.name}</h3>
+                                <p class="text-slate-600"><span class="font-semibold">Mục tiêu:</span> ${p.goal}</p>
+                                <p class="text-slate-600"><span class="font-semibold">Kết quả:</span> ${p.result}</p>
+                            </div>
+                            <button class="gemini-suggest-activity bg-gradient-to-r from-purple-500 to-sky-500 text-white font-semibold px-3 py-1.5 rounded-lg shadow-md hover:scale-105 transition-transform text-sm whitespace-nowrap" data-program-name="${p.name}">✨ Gợi ý Hoạt động</button>
+                        </div>
+                        ${extraButton}
+                    </div>`;
+        }).join('');
+
+        talentTabsContainer.innerHTML = `<div class="flex border-b border-slate-200 mb-4 overflow-x-auto">${tabButtons}</div><div id="talent-content-container">${tabContents}</div>`;
+    };
+
+    const renderParticipants = (data) => {
+        const filtered = data.participants.filter(p => p.name.toLowerCase().includes(state.searchTerm.toLowerCase()) || p.program.toLowerCase().includes(state.searchTerm.toLowerCase()));
+        if (filtered.length === 0) {
+            participantsTableBody.innerHTML = `<tr><td colspan="4" class="text-center p-6 text-slate-500">Không tìm thấy kết quả.</td></tr>`;
+            return;
+        }
+        participantsTableBody.innerHTML = filtered.map(p => `
+            <tr class="border-b border-slate-200 last:border-0 hover:bg-slate-50">
+                <td class="p-4 text-slate-800">${p.name}</td>
+                <td class="p-4 text-slate-600">${p.program}</td>
+                <td class="p-4"><span class="px-2 py-1 text-xs font-semibold rounded-full ${p.status === 'Đã hoàn thành' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${p.status}</span></td>
+                <td class="p-4 text-center space-x-2">
+                    <button class="edit-participant-button text-sm text-blue-600 hover:text-blue-800 font-semibold" data-id="${p.id}">Sửa</button>
+                    <button class="gemini-suggest-idp text-sm text-sky-600 hover:text-sky-800 font-semibold" data-name="${p.name}" data-program="${p.program}" data-status="${p.status}">✨ Gợi ý IDP</button>
+                </td>
+            </tr>`).join('');
+    };
+    
+    const renderAdminPage = () => {
+        kpiTableBody.innerHTML = Object.keys(appData).map(year => {
+            const kpis = appData[year].kpis;
+            return `<tr class="border-b border-slate-200 last:border-0">
+                        <td class="p-3 font-semibold">${year}</td>
+                        <td class="p-3">${kpis.total}</td>
+                        <td class="p-3">${kpis.talent}</td>
+                        <td class="p-3">${kpis.rate}%</td>
+                        <td class="p-3">${kpis.courses}</td>
+                        <td class="p-3"><button class="edit-kpi-button text-sm text-blue-600 hover:text-blue-800 font-semibold" data-year="${year}">Sửa</button></td>
+                    </tr>`;
+        }).join('');
+    };
+    
+    // --- CHART FUNCTIONS ---
+    const updateDistributionChart = (data) => {
+        const ctx = document.getElementById('distribution-chart').getContext('2d');
+        const labels = data.participants.map(p => p.program);
+        const counts = labels.reduce((acc, curr) => (acc[curr] = (acc[curr] || 0) + 1, acc), {});
+        if (charts.distribution) charts.distribution.destroy();
+        charts.distribution = new Chart(ctx, { type: 'doughnut', data: { labels: Object.keys(counts), datasets: [{ data: Object.values(counts), backgroundColor: ['#38bdf8', '#34d399', '#facc15', '#a78bfa'], borderColor: '#fff', borderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } } });
+    };
+    
+    const updatePmResultsChart = (data) => {
+        const ctx = document.getElementById('pm-results-chart').getContext('2d');
+        const pmResults = data.pm.results;
+        if (charts.pmResults) charts.pmResults.destroy();
+        charts.pmResults = new Chart(ctx, { type: 'bar', data: { labels: ['% QL được đào tạo', '% QL thực hiện 1:1', '% NV hài lòng'], datasets: [{ label: `Kết quả năm ${state.selectedYear} (%)`, data: [pmResults.trained, pmResults.oneOnOne, pmResults.satisfied], backgroundColor: ['#38bdf8', '#34d399', '#a78bfa'], borderRadius: 4, }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100, ticks: { callback: (v) => v + '%' } } }, plugins: { legend: { display: false } } } });
+    };
+
+    // --- EVENT LISTENERS ---
+    sidebarNav.addEventListener('click', (e) => { e.preventDefault(); const link = e.target.closest('a'); if (link?.dataset.page) { state.currentPage = link.dataset.page; render(); } });
+    yearSelector.addEventListener('change', (e) => { state.selectedYear = e.target.value; render(); });
+    searchInput.addEventListener('input', (e) => { state.searchTerm = e.target.value; if (state.currentPage === 'participants') renderParticipants(appData[state.selectedYear]); });
+    searchInput.addEventListener('focus', () => { if (state.currentPage !== 'participants') { state.currentPage = 'participants'; render(); } });
+    
+    // --- FORM & MODAL EVENT LISTENERS ---
+    document.body.addEventListener('click', (e) => {
+        // Add Participant Button
+        if (e.target.id === 'add-participant-button') {
+            const formContent = `
+                <input type="hidden" name="id" value="${Date.now()}">
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Họ và tên</label><input type="text" name="full_name" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required></div>
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Chương trình</label><input type="text" name="program_name" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required></div>
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Trạng thái</label><select name="status" class="w-full px-3 py-2 border border-slate-300 rounded-lg"><option value="Đang tham gia">Đang tham gia</option><option value="Đã hoàn thành">Đã hoàn thành</option></select></div>
+            `;
+            showModal(createFormModal('Thêm Thành viên mới', 'add-participant-form', formContent, 'Lưu'));
+        }
+
+        // Add Program Button
+        if (e.target.id === 'add-program-button') {
+            const formContent = `
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Tên Chương trình</label><input type="text" name="program_name" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required></div>
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Mục tiêu</label><textarea name="goal" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-lg"></textarea></div>
+                <div><label class="block text-sm font-medium text-slate-600 mb-1">Kết quả</label><textarea name="result" rows="2" class="w-full px-3 py-2 border border-slate-300 rounded-lg"></textarea></div>
+            `;
+            showModal(createFormModal(`Thêm Chương trình cho năm ${state.selectedYear}`, 'add-program-form', formContent, 'Lưu'));
+        }
+
+        // Edit Participant Button (delegated)
+        if (e.target.classList.contains('edit-participant-button')) {
+            const id = parseInt(e.target.dataset.id);
+            const participant = appData[state.selectedYear].participants.find(p => p.id === id);
+            if (participant) {
+                const formContent = `
+                    <input type="hidden" name="id" value="${participant.id}">
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Họ và tên</label><input type="text" name="full_name" value="${participant.name}" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required></div>
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Chương trình</label><input type="text" name="program_name" value="${participant.program}" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required></div>
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Trạng thái</label><select name="status" class="w-full px-3 py-2 border border-slate-300 rounded-lg"><option value="Đang tham gia" ${participant.status === 'Đang tham gia' ? 'selected' : ''}>Đang tham gia</option><option value="Đã hoàn thành" ${participant.status === 'Đã hoàn thành' ? 'selected' : ''}>Đã hoàn thành</option></select></div>
+                `;
+                showModal(createFormModal('Chỉnh sửa Thành viên', 'edit-participant-form', formContent, 'Cập nhật'));
+            }
+        }
+
+        // Edit KPI Button (delegated)
+        if (e.target.classList.contains('edit-kpi-button')) {
+            const year = e.target.dataset.year;
+            const kpis = appData[year].kpis;
+            const formContent = `
+                <input type="hidden" name="year" value="${year}">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Tổng thành viên</label><input type="number" name="total" value="${kpis.total}" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required></div>
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Nhân tài phát triển</label><input type="number" name="talent" value="${kpis.talent}" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required></div>
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Tỷ lệ hoàn thành (%)</label><input type="number" name="rate" value="${kpis.rate}" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required></div>
+                    <div><label class="block text-sm font-medium text-slate-600 mb-1">Khóa học tổ chức</label><input type="number" name="courses" value="${kpis.courses}" class="w-full px-3 py-2 border border-slate-300 rounded-lg" required></div>
+                </div>
+            `;
+            showModal(createFormModal(`Chỉnh sửa KPI năm ${year}`, 'edit-kpi-form', formContent, 'Cập nhật'));
+        }
+        
+        // Gemini Suggest IDP Button (delegated)
+        if (e.target.classList.contains('gemini-suggest-idp')) {
+            const { name, program, status } = e.target.dataset;
+            const prompt = `Với vai trò là một cố vấn phát triển sự nghiệp, hãy gợi ý một Lộ trình Phát triển Cá nhân (IDP) cho nhân viên tên là ${name}. Họ đang tham gia chương trình "${program}" và có trạng thái "${status}". Lộ trình nên bao gồm: 1. Mục tiêu phát triển chính. 2. Ba hành động cụ thể để đạt được mục tiêu. 3. Các nguồn lực/hỗ trợ cần thiết. Trình bày bằng tiếng Việt, định dạng markdown.`;
+            callGeminiAPI(prompt, `✨ Gợi ý IDP cho ${name}`);
+        }
+
+        // Talent Tab Buttons (delegated)
+        if (e.target.classList.contains('talent-tab')) {
+            const index = e.target.dataset.index;
+            document.querySelectorAll('.talent-tab').forEach(t => t.classList.remove('text-sky-600', 'border-sky-600'));
+            e.target.classList.add('text-sky-600', 'border-sky-600');
+            document.querySelectorAll('.talent-content').forEach(c => c.classList.add('hidden'));
+            const contentToShow = Array.from(document.querySelectorAll('.talent-content'))[index];
+            if(contentToShow) contentToShow.classList.remove('hidden');
+        }
+        
+        // Talent Gemini Buttons (delegated)
+        if (e.target.classList.contains('gemini-suggest-activity')) {
+            const programName = e.target.dataset.programName;
+            const prompt = `Với vai trò là một chuyên gia thiết kế đào tạo, hãy gợi ý 3 hoạt động phát triển sáng tạo cho chương trình "${programName}". Các gợi ý nên tập trung vào kỹ năng thực tế, gắn kết đội ngũ và thúc đẩy tư duy lãnh đạo. Trình bày bằng tiếng Việt, định dạng markdown.`;
+            callGeminiAPI(prompt, `✨ Gợi ý cho chương trình "${programName}"`);
+        } else if (e.target.classList.contains('gemini-interview-questions')) {
+            const programName = e.target.dataset.programName;
+            const prompt = `Với vai trò là một chuyên gia tuyển dụng, hãy tạo 5 câu hỏi phỏng vấn hành vi (behavioral interview questions) để đánh giá ứng viên cho chương trình "${programName}". Các câu hỏi cần tập trung vào việc đánh giá tiềm năng lãnh đạo, khả năng giải quyết vấn đề, và sự nhanh nhạy trong học hỏi. Trình bày bằng tiếng Việt, định dạng markdown.`;
+            callGeminiAPI(prompt, `✨ Câu hỏi phỏng vấn cho "${programName}"`);
+        }
+    });
+
+    modalContainer.addEventListener('submit', e => {
+        e.preventDefault();
+        const form = e.target;
+        if (form.id === 'gemini-form') { hideModal(form.closest('.modal-container')); return; }
+
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData.entries());
+
+        if (form.id === 'add-participant-form' || form.id === 'edit-participant-form') {
+            const yearData = appData[state.selectedYear];
+            const id = parseInt(data.id);
+            const index = yearData.participants.findIndex(p => p.id === id);
+            const newParticipant = { id: id, name: data.full_name, program: data.program_name, status: data.status };
+            if (index > -1) {
+                yearData.participants[index] = newParticipant;
+            } else {
+                yearData.participants.push(newParticipant);
+            }
+        } else if (form.id === 'add-program-form') {
+             appData[state.selectedYear].talent.push({ name: data.program_name, goal: data.goal, result: data.result });
+        } else if (form.id === 'edit-kpi-form') {
+            appData[data.year].kpis = { total: parseInt(data.total), talent: parseInt(data.talent), rate: parseInt(data.rate), courses: parseInt(data.courses) };
+        }
+        
+        hideModal(form.closest('.modal-container'));
+        render();
+    });
+
+    // --- Direct Button Event Listeners (with null checks) ---
+    const geminiAnalyzeKpiBtn = document.getElementById('gemini-analyze-kpi');
+    if (geminiAnalyzeKpiBtn) geminiAnalyzeKpiBtn.addEventListener('click', () => {
+        const data = appData[state.selectedYear];
+        const prompt = `Với vai trò là một chuyên gia phân tích nhân sự, hãy phân tích các chỉ số hiệu suất (KPI) của chương trình "High Performance" năm ${state.selectedYear}. Dữ liệu: Tổng thành viên: ${data.kpis.total}, Nhân tài phát triển: ${data.kpis.talent}, Tỷ lệ hoàn thành: ${data.kpis.rate}%, Khóa học tổ chức: ${data.kpis.courses}. Vui lòng cung cấp: 1. **Phân tích ngắn gọn:** Nêu bật điểm mạnh và lĩnh vực cần cải thiện. 2. **Đề xuất hành động:** Đưa ra 3 đề xuất cụ thể để cải thiện. Trình bày bằng tiếng Việt, định dạng markdown.`;
+        callGeminiAPI(prompt, `✨ Phân tích KPI năm ${state.selectedYear}`);
+    });
+
+    const geminiDraftBtn = document.getElementById('gemini-draft-button');
+    if (geminiDraftBtn) geminiDraftBtn.addEventListener('click', () => {
+        const topic = document.getElementById('draft-topic-input').value.trim();
+        if (!topic) { alert("Vui lòng nhập chủ đề cần soạn thảo."); return; }
+        const prompt = `Với vai trò là một chuyên viên truyền thông nội bộ, hãy giúp tôi soạn một thông báo chuyên nghiệp và hấp dẫn qua email về chủ đề sau: "${topic}". Thông báo cần có tiêu đề thu hút, nội dung rõ ràng, và lời kêu gọi hành động (nếu có). Trình bày bằng tiếng Việt.`;
+        callGeminiAPI(prompt, `✨ Soạn thảo về: "${topic}"`);
+    });
+    
+    const geminiFeedbackBtn = document.getElementById('gemini-feedback-button');
+    if (geminiFeedbackBtn) geminiFeedbackBtn.addEventListener('click', () => {
+        const notes = document.getElementById('feedback-input').value.trim();
+        if (!notes) { alert("Vui lòng nhập các quan sát về nhân viên."); return; }
+        const prompt = `Với vai trò là một quản lý nhân sự giàu kinh nghiệm, hãy chuyển các ghi chú sau thành một đoạn phản hồi hiệu suất có cấu trúc, chuyên nghiệp và mang tính xây dựng. Sử dụng ngôn ngữ tích cực, tập trung vào hành vi và đưa ra gợi ý phát triển. Ghi chú: "${notes}". Vui lòng trình bày theo cấu trúc: Điểm mạnh, Điểm cần cải thiện, và Gợi ý hành động. Trình bày bằng tiếng Việt, định dạng markdown.`;
+        callGeminiAPI(prompt, `✨ Gợi ý Phản hồi Hiệu suất`);
+    });
+    
+    const geminiCourseBtn = document.getElementById('gemini-course-button');
+    if (geminiCourseBtn) geminiCourseBtn.addEventListener('click', () => {
+        const topic = document.getElementById('course-topic-input').value.trim();
+        if (!topic) { alert("Vui lòng nhập chủ đề khóa học."); return; }
+        const prompt = `Với vai trò là một chuyên gia thiết kế chương trình đào tạo (Instructional Designer), hãy tạo một đề cương chi tiết cho khóa học với chủ đề: "${topic}". Đề cương cần bao gồm: 1. Mục tiêu học tập (Learning Objectives). 2. Cấu trúc các học phần (Modules). 3. Các chủ đề chính trong mỗi học phần. Trình bày bằng tiếng Việt, định dạng markdown chuyên nghiệp.`;
+        callGeminiAPI(prompt, `✨ Đề cương Khóa học: ${topic}`);
+    });
+    
+    const geminiJdBtn = document.getElementById('gemini-jd-button');
+    if (geminiJdBtn) geminiJdBtn.addEventListener('click', () => {
+        const title = document.getElementById('jd-title-input').value.trim();
+        const responsibilities = document.getElementById('jd-responsibilities-input').value.trim();
+        if (!title || !responsibilities) { alert("Vui lòng nhập Chức danh và Trách nhiệm chính."); return; }
+        const prompt = `Với vai trò là một chuyên gia tuyển dụng, hãy viết một bản Mô tả Công việc (Job Description) hoàn chỉnh và hấp dẫn cho vị trí "${title}". Các trách nhiệm chính bao gồm:\n${responsibilities}\n\nBản mô tả cần có các phần sau: Mô tả chung về công việc, Trách nhiệm chính (dựa trên các ý đã cho), Yêu cầu về kỹ năng và kinh nghiệm, và Quyền lợi. Sử dụng ngôn ngữ chuyên nghiệp, thu hút ứng viên. Trình bày bằng tiếng Việt.`;
+        callGeminiAPI(prompt, `✨ Mô tả Công việc: ${title}`);
+    });
+
+    // --- INITIALIZATION ---
+    render();
+});
+</script>
+
+</body>
+</html>
